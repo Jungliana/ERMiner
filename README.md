@@ -1,2 +1,2 @@
 # ERMiner
-Implementation of algorithm ERMiner: Sequential Rule Mining using Equivalence Classes.
+Python implementation of algorithm ERMiner: Sequential Rule Mining using Equivalence Classes.
