@@ -1,21 +1,11 @@
 from collections import defaultdict
-from Rule import Rule
 from copy import copy
-
-
-def read_database(path: str) -> list[list[set[int]]]:
-    sequences = []
-    with open(path) as file:
-        for line in file:
-            if line[0] != '-':
-                sequences.append([set(map(int, transaction.split()))
-                                  for transaction in line.rstrip("-1 -2\n").split("-1")])
-    return sequences
+from Rule import Rule
 
 
 class RuleGrowth:
-    def __init__(self, database: list[list[set[int]]], minsup: float = 0.75, mincon: float = 0.5):
-        self.database: list[list[set[int]]] = database
+    def __init__(self, file_path: str, minsup: float = 0.75, mincon: float = 0.5):
+        self.database: list[list[set[int]]] = self.read_database(file_path)
         self.db_size: int = len(self.database)
         self.min_sup: float = minsup
         self.min_conf: float = mincon
@@ -27,9 +17,20 @@ class RuleGrowth:
         self.first_occurrences = defaultdict(dict)
         self.last_occurrences = defaultdict(dict)
 
-    def print_rules(self) -> None:
-        for rule in self.rules:
-            print(rule)
+    @staticmethod
+    def read_database(file_path: str) -> list[list[set[int]]]:
+        sequences = []
+        with open(file_path) as file:
+            for line in file:
+                if line[0] != '-':
+                    sequences.append([set(map(int, transaction.split()))
+                                      for transaction in line.rstrip("-1 -2\n").split("-1")])
+        return sequences
+
+    def run(self) -> None:
+        self.scan_database()
+        self.find_rules()
+        self.print_rules()
 
     def scan_database(self) -> None:
         for i, sequence in enumerate(self.database):
@@ -50,6 +51,16 @@ class RuleGrowth:
                     self.expand(antecedent=i, consequent=j, sids=sids_i_j)
                     self.expand(antecedent=j, consequent=i, sids=sids_j_i)
 
+    def find_rule_sequences(self, common_sequences, i, j) -> tuple[set[int], set[int]]:
+        sids_i_j = set()
+        sids_j_i = set()
+        for sequence in common_sequences:
+            if self.first_occurrences[i][sequence] < self.last_occurrences[j][sequence]:
+                sids_i_j.add(sequence)
+            if self.first_occurrences[j][sequence] < self.last_occurrences[i][sequence]:
+                sids_j_i.add(sequence)
+        return sids_i_j, sids_j_i
+
     def expand(self, antecedent: int, consequent: int, sids: set[int]) -> None:
         if (rule_support := len(sids) / self.db_size) >= self.min_sup:
             new_rule = Rule({antecedent}, {consequent}, rule_support)
@@ -61,20 +72,16 @@ class RuleGrowth:
                               last_occurrences_j=self.last_occurrences[consequent])
             self.check_rule_confidence(new_rule, self.sequence_ids[antecedent], sids)
 
-    def check_rule_confidence(self, new_rule, sids_i, sids_i_j) -> None:
-        if (rule_confidence := len(sids_i_j) / len(sids_i)) >= self.min_conf:
-            new_rule.confidence = round(rule_confidence, 3)
-            self.rules.append(new_rule)
-
-    def find_rule_sequences(self, common_sequences, i, j) -> tuple[set[int], set[int]]:
-        sids_i_j = set()
-        sids_j_i = set()
-        for sequence in common_sequences:
-            if self.first_occurrences[i][sequence] < self.last_occurrences[j][sequence]:
-                sids_i_j.add(sequence)
-            if self.first_occurrences[j][sequence] < self.last_occurrences[i][sequence]:
-                sids_j_i.add(sequence)
-        return sids_i_j, sids_j_i
+    def expand_left(self, rule_i_j: Rule, sids_i: set,
+                    sids_i_j: set, last_occurrences_j: dict) -> None:
+        sids_c = self.find_items_to_left_expand(list(sids_i_j), last_occurrences_j, max(rule_i_j.antecedent))
+        for c in sids_c:
+            if (rule_support := len(sids_c[c])/self.db_size) >= self.min_sup:
+                sids_ic = sids_c[c] & sids_i
+                rule_ic_j = Rule(rule_i_j.antecedent | {c}, rule_i_j.consequent, rule_support)
+                self.expand_left(rule_i_j=rule_ic_j, sids_i=sids_ic,
+                                 sids_i_j=sids_c[c], last_occurrences_j=last_occurrences_j)
+                self.check_rule_confidence(rule_ic_j, sids_i=sids_ic, sids_i_j=sids_c[c])
 
     def find_items_to_left_expand(self, sequence_ids: list[int], last_occurrences: dict, max_item: int) -> dict:
         """
@@ -89,34 +96,6 @@ class RuleGrowth:
                     if item > max_item:
                         sequence_ids_c[item].add(sid)
         return sequence_ids_c
-
-    def find_items_to_right_expand(self, sequence_ids: list[int], first_occurrences: dict, max_item: int) -> dict:
-        """
-        For each sid ∈ sidsI->J, scan the sequence sid from the itemset after the first occurrence of I
-        to the last itemset. For each item c appearing in these sequences that is lexically larger than
-        items in J, record in a variable sidsI->Jc the sids of the sequences where c is found.
-        """
-        sequence_ids_c = defaultdict(set)
-        for sid in sequence_ids:
-            for i in range(first_occurrences[sid]+1, len(self.database[sid])):
-                for item in self.database[sid][i]:
-                    if item > max_item:
-                        sequence_ids_c[item].add(sid)
-        return sequence_ids_c
-
-    def expand_left(self, rule_i_j: Rule, sids_i: set,
-                    sids_i_j: set, last_occurrences_j: dict) -> None:
-        # sids i, eg. {1, 2, 5}
-        # sids i->j, eg. {1, 5}
-        # last occurrences j, eg. {1:3, 2:5, 7:2}
-        sids_c = self.find_items_to_left_expand(list(sids_i_j), last_occurrences_j, max(rule_i_j.antecedent))
-        for c in sids_c:
-            if (rule_support := len(sids_c[c])/self.db_size) >= self.min_sup:
-                sids_ic = sids_c[c] & sids_i
-                rule_ic_j = Rule(rule_i_j.antecedent | {c}, rule_i_j.consequent, rule_support)
-                self.expand_left(rule_i_j=rule_ic_j, sids_i=sids_ic,
-                                 sids_i_j=sids_c[c], last_occurrences_j=last_occurrences_j)
-                self.check_rule_confidence(rule_ic_j, sids_i=sids_ic, sids_i_j=sids_c[c])
 
     def expand_right(self, rule_i_j: Rule, sids_i: set, sids_j: set, sids_i_j: set,
                      first_occurrences_i: dict, last_occurrences_j: dict) -> None:
@@ -133,6 +112,20 @@ class RuleGrowth:
                                   last_occurrences_j=last_occurrences_jc)
                 self.check_rule_confidence(rule_i_jc, sids_i=sids_i, sids_i_j=sids_c[c])
 
+    def find_items_to_right_expand(self, sequence_ids: list[int], first_occurrences: dict, max_item: int) -> dict:
+        """
+        For each sid ∈ sidsI->J, scan the sequence sid from the itemset after the first occurrence of I
+        to the last itemset. For each item c appearing in these sequences that is lexically larger than
+        items in J, record in a variable sidsI->Jc the sids of the sequences where c is found.
+        """
+        sequence_ids_c = defaultdict(set)
+        for sid in sequence_ids:
+            for i in range(first_occurrences[sid]+1, len(self.database[sid])):
+                for item in self.database[sid][i]:
+                    if item > max_item:
+                        sequence_ids_c[item].add(sid)
+        return sequence_ids_c
+
     def update_last_occurrences(self, last_occurrences_j: dict[int], c: int, sids_jc: set) -> dict[int]:
         last_occurrences_jc = copy(last_occurrences_j)
         for sid in sids_jc:
@@ -141,13 +134,16 @@ class RuleGrowth:
                     last_occurrences_jc.update({sid: j})
         return last_occurrences_jc
 
-    def run(self):
-        self.scan_database()
-        self.find_rules()
-        self.print_rules()
+    def check_rule_confidence(self, new_rule, sids_i, sids_i_j) -> None:
+        if (rule_confidence := len(sids_i_j) / len(sids_i)) >= self.min_conf:
+            new_rule.confidence = round(rule_confidence, 3)
+            self.rules.append(new_rule)
+
+    def print_rules(self) -> None:
+        for rule in self.rules:
+            print(rule)
 
 
 if __name__ == "__main__":
-    data = read_database("example.txt")
-    rulegrowth = RuleGrowth(data, 0.5, 0.75)
+    rulegrowth = RuleGrowth("data/example.txt", 0.25, 0.75)
     rulegrowth.run()
