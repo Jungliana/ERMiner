@@ -1,4 +1,5 @@
 from collections import defaultdict
+from Rule import Rule
 
 
 def read_database(path: str) -> list[list[set[int]]]:
@@ -9,14 +10,6 @@ def read_database(path: str) -> list[list[set[int]]]:
                 sequences.append([set(map(int, transaction.split()))
                                   for transaction in line.rstrip("-1 -2\n").split("-1")])
     return sequences
-
-
-class Rule:
-    def __init__(self, antecedent: set[int], consequent: set[int]):
-        self.antecedent = antecedent
-        self.consequent = consequent
-        self.support = 0.
-        self.confidence = 0.
 
 
 class ERMiner:

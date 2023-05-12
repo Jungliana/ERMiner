@@ -1,4 +1,5 @@
 from collections import defaultdict
+from Rule import Rule
 
 
 def read_database(path: str) -> list[list[set[int]]]:
@@ -56,8 +57,8 @@ class RuleGrowth:
                         if self.first_occurrences[j][sequence] < self.last_occurrences[i][sequence]:
                             sids_j_i.add(sequence)
                     if len(sids_i_j) / self.db_size >= self.min_sup:
-                        self.expand_left(rule_I_J=({i}, {j}), sids_I=self.sequence_ids[i],
-                                         sids_I_J=sids_i_j, last_occurrences_J=self.last_occurrences[j])
+                        self.expand_left(rule_i_j=({i}, {j}), sids_i=self.sequence_ids[i],
+                                         sids_i_j=sids_i_j, last_occurrences_j=self.last_occurrences[j])
                         # self.expand_right()
                         self.rules.append(({i}, {j}))
 
@@ -70,20 +71,20 @@ class RuleGrowth:
                         sequence_ids_c[item].add(sid)
         return sequence_ids_c
 
-    def expand_left(self, rule_I_J: tuple[set, set], sids_I: set,
-                    sids_I_J: set, last_occurrences_J: dict) -> None:
+    def expand_left(self, rule_i_j: tuple[set, set], sids_i: set,
+                    sids_i_j: set, last_occurrences_j: dict) -> None:
         # rule, eg. ({a, b}, {c})
         # sids I, eg. {1, 2, 5}
         # sids I->J, eg. {1, 5}
         # last occurrences J, eg. {1:3, 2:5, 7:2}
-        sids_c = self.find_items_to_expand(list(sids_I_J), last_occurrences_J, max(rule_I_J[0]))
+        sids_c = self.find_items_to_expand(list(sids_i_j), last_occurrences_j, max(rule_i_j[0]))
         for c in sids_c:
             if len(sids_c[c])/self.db_size >= self.min_sup:
-                sids_I_c = sids_c[c] & sids_I
-                rule_Ic_J = (rule_I_J[0] | {c}, rule_I_J[1])
-                self.expand_left(rule_I_J=rule_Ic_J, sids_I=sids_I_c,
-                                 sids_I_J=sids_c[c], last_occurrences_J=last_occurrences_J)
-                self.rules.append(rule_Ic_J)
+                sids_i_c = sids_c[c] & sids_i
+                rule_ic_j = (rule_i_j[0] | {c}, rule_i_j[1])
+                self.expand_left(rule_i_j=rule_ic_j, sids_i=sids_i_c,
+                                 sids_i_j=sids_c[c], last_occurrences_j=last_occurrences_j)
+                self.rules.append(rule_ic_j)
 
     def expand_right(self):
         pass
