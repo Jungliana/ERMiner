@@ -77,7 +77,7 @@ class RuleGrowth:
         sids_c = self.find_items_to_left_expand(list(sids_i_j), last_occurrences_j, max(rule_i_j.antecedent))
         for c in sids_c:
             if (rule_support := len(sids_c[c])/self.db_size) >= self.min_sup:
-                sids_ic = sids_c[c] & sids_i
+                sids_ic = self.sequence_ids[c] & sids_i
                 rule_ic_j = Rule(rule_i_j.antecedent | {c}, rule_i_j.consequent, round(rule_support, 3))
                 self.expand_left(rule_i_j=rule_ic_j, sids_i=sids_ic,
                                  sids_i_j=sids_c[c], last_occurrences_j=last_occurrences_j)

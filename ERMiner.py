@@ -11,7 +11,7 @@ class ERMiner:
 
         self.left_equivalence = defaultdict(list)
         self.right_equivalence = defaultdict(list)
-        self.left_store = defaultdict(list)
+        self.left_store = defaultdict(lambda: defaultdict(list))
         self.rules: list[Rule] = []
         self.sparse_count_matrix = defaultdict(int)
 
@@ -63,10 +63,10 @@ class ERMiner:
         for left_class in self.left_equivalence:
             self.left_search(self.left_equivalence[left_class])
         for right_class in self.right_equivalence:
-            self.right_search(right_class)
+            self.right_search(self.right_equivalence[right_class])
         for left_class_size in self.left_store:
-            for itemset in left_class_size:
-                self.left_search(itemset)
+            for itemset in self.left_store[left_class_size]:
+                self.left_search(self.left_store[left_class_size][itemset])
 
     def build_equivalences(self, antecedent, consequent, sids):
         if (rule_support := len(sids) / self.db_size) >= self.min_sup:
@@ -106,14 +106,33 @@ class ERMiner:
     def left_merge(self, rule_s: Rule, rule_r: Rule, left_equiv: list[Rule]) -> None:
         rule_sequences = rule_s.sequences & rule_r.sequences
         if (rule_support := len(rule_sequences) / self.db_size) >= self.min_sup:
+            new_rule = Rule(rule_s.antecedent, rule_s.consequent | rule_r.consequent, rule_support,
+                            sequences=rule_sequences, antecedent_sequences=rule_s.antecedent_sequences)
             if (rule_confidence := len(rule_sequences) / len(rule_s.antecedent_sequences)) >= self.min_conf:
-                new_rule = Rule(rule_s.antecedent, rule_s.consequent | rule_r.consequent, rule_support, rule_confidence,
-                                sequences=rule_sequences, antecedent_sequences=rule_s.antecedent_sequences)
+                new_rule.confidence = rule_confidence
                 self.rules.append(new_rule)
-                left_equiv.append(new_rule)
+            left_equiv.append(new_rule)
 
     def right_search(self, right_equiv):
-        pass
+        for i in range(len(right_equiv)):
+            right_equiv_prim = []
+            for j in range(i+1, len(right_equiv)):
+                uncommon_items = frozenset(right_equiv[i].antecedent ^ right_equiv[j].antecedent)
+                if not self.qualifies_to_pruning(uncommon_items):
+                    self.right_merge(right_equiv[i], right_equiv[j], right_equiv_prim)
+            self.right_search(right_equiv_prim)
+
+    def right_merge(self, rule_s: Rule, rule_r: Rule, right_equiv: list[Rule]) -> None:
+        rule_sequences = rule_s.sequences & rule_r.sequences
+        if (rule_support := len(rule_sequences) / self.db_size) >= self.min_sup:
+            antecedent_sequences = rule_s.antecedent_sequences & rule_r.antecedent_sequences
+            new_rule = Rule(rule_s.antecedent | rule_r.antecedent, rule_s.consequent, rule_support,
+                            sequences=rule_sequences, antecedent_sequences=antecedent_sequences)
+            if (rule_confidence := len(rule_sequences) / len(antecedent_sequences)) >= self.min_conf:
+                new_rule.confidence = rule_confidence
+                self.rules.append(new_rule)
+            right_equiv.append(new_rule)
+            self.left_store[len(new_rule.antecedent)][frozenset(new_rule.antecedent)].append(new_rule)
 
     def print_rules(self) -> None:
         for rule in self.rules:
