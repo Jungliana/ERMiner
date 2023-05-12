@@ -20,8 +20,10 @@ class RuleGrowth:
         self.min_conf: float = mincon
         self.rules: list[Rule] = []
 
-        self.sequence_ids = defaultdict(set)  # for every item, set of sequence ids where it occurs, eg. {1:{1, 2, 3}, 2:{1, 3, 4}...}
-        self.first_occurrences = defaultdict(dict)  # for every item, dict seq id:first occurrence, eg. {1:{1:1, 2:4, 3:2}, 2:{1:2}...}
+        # for every item, set of sequence ids where it occurs, eg. {1:{1, 2, 3}, 2:{1, 3, 4}...}
+        self.sequence_ids = defaultdict(set)
+        # for every item, dict seq id:first(last) occurrence, eg. {1:{1:1, 2:4, 3:2}, 2:{1:2}...}
+        self.first_occurrences = defaultdict(dict)
         self.last_occurrences = defaultdict(dict)
 
     def print_rules(self) -> None:
@@ -47,25 +49,29 @@ class RuleGrowth:
             del self.first_occurrences[item]
             del self.last_occurrences[item]
 
-    def find_1_1_rules(self):
+    def find_rules(self):
         all_item_ids = list(self.sequence_ids)
         for i in all_item_ids:
             for j in all_item_ids[i+1:]:
                 common_sequences = self.sequence_ids[i] & self.sequence_ids[j]
                 if len(common_sequences)/self.db_size >= self.min_sup:
-                    sids_i_j = set()
-                    sids_j_i = set()
-                    for sequence in common_sequences:
-                        if self.first_occurrences[i][sequence] < self.last_occurrences[j][sequence]:
-                            sids_i_j.add(sequence)
-                        if self.first_occurrences[j][sequence] < self.last_occurrences[i][sequence]:
-                            sids_j_i.add(sequence)
+                    sids_i_j, sids_j_i = self.find_rule_sequences(common_sequences, i, j)
                     if (rule_support := len(sids_i_j)/self.db_size) >= self.min_sup:
                         new_rule = Rule({i}, {j}, rule_support)
                         self.expand_left(rule_i_j=new_rule, sids_i=self.sequence_ids[i],
                                          sids_i_j=sids_i_j, last_occurrences_j=self.last_occurrences[j])
                         # self.expand_right()
                         self.rules.append(new_rule)
+
+    def find_rule_sequences(self, common_sequences, i, j):
+        sids_i_j = set()
+        sids_j_i = set()
+        for sequence in common_sequences:
+            if self.first_occurrences[i][sequence] < self.last_occurrences[j][sequence]:
+                sids_i_j.add(sequence)
+            if self.first_occurrences[j][sequence] < self.last_occurrences[i][sequence]:
+                sids_j_i.add(sequence)
+        return sids_i_j, sids_j_i
 
     def find_items_to_expand(self, sequence_ids: list[int], last_occurrences: dict, max_item: int) -> dict:
         sequence_ids_c = defaultdict(set)
@@ -96,7 +102,7 @@ class RuleGrowth:
 
     def run(self):
         self.scan_database()
-        self.find_1_1_rules()
+        self.find_rules()
 
 
 if __name__ == "__main__":
