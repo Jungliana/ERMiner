@@ -43,8 +43,8 @@ class RuleGrowth:
 
     def find_rules(self) -> None:
         all_item_ids = list(self.sequence_ids)
-        for i in all_item_ids:
-            for j in all_item_ids[i+1:]:
+        for last_i, i in enumerate(all_item_ids):
+            for j in all_item_ids[last_i+1:]:
                 common_sequences = self.sequence_ids[i] & self.sequence_ids[j]
                 if len(common_sequences)/self.db_size >= self.min_sup:
                     sids_i_j, sids_j_i = self.find_rule_sequences(common_sequences, i, j)
@@ -129,9 +129,8 @@ class RuleGrowth:
     def update_last_occurrences(self, last_occurrences_j: dict[int], c: int, sids_jc: set) -> dict[int]:
         last_occurrences_jc = copy(last_occurrences_j)
         for sid in sids_jc:
-            for j, itemset in enumerate(self.database[sid]):
-                if c in itemset and j < last_occurrences_jc[sid]:
-                    last_occurrences_jc.update({sid: j})
+            if (j := self.last_occurrences[c][sid]) < last_occurrences_j[sid]:
+                last_occurrences_jc.update({sid: j})
         return last_occurrences_jc
 
     def check_rule_confidence(self, new_rule, sids_i, sids_i_j) -> None:

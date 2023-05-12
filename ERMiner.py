@@ -53,15 +53,15 @@ class ERMiner:
 
     def find_rules(self):
         all_item_ids = list(self.sequence_ids)
-        for i in all_item_ids:
-            for j in all_item_ids[i+1:]:
+        for last_i, i in enumerate(all_item_ids):
+            for j in all_item_ids[last_i+1:]:
                 common_sequences = self.sequence_ids[i] & self.sequence_ids[j]
                 if len(common_sequences)/self.db_size >= self.min_sup:
                     sids_i_j, sids_j_i = self.find_rule_sequences(common_sequences, i, j)
                     self.build_equivalences(i, j, sids_i_j)
                     self.build_equivalences(j, i, sids_j_i)
         for left_class in self.left_equivalence:
-            self.left_search(left_class)
+            self.left_search(self.left_equivalence[left_class])
         for right_class in self.right_equivalence:
             self.right_search(right_class)
         for left_class_size in self.left_store:
@@ -70,7 +70,8 @@ class ERMiner:
 
     def build_equivalences(self, antecedent, consequent, sids):
         if (rule_support := len(sids) / self.db_size) >= self.min_sup:
-            new_rule = Rule({antecedent}, {consequent}, round(rule_support, 3))
+            new_rule = Rule({antecedent}, {consequent}, round(rule_support, 3), sequences=sids,
+                            antecedent_sequences=self.sequence_ids[antecedent])
             self.left_equivalence[antecedent].append(new_rule)
             self.right_equivalence[consequent].append(new_rule)
             self.check_rule_confidence(new_rule, self.sequence_ids[antecedent], sids)
@@ -90,18 +91,26 @@ class ERMiner:
                 sids_j_i.add(sequence)
         return sids_i_j, sids_j_i
 
-    # def remove_items_with_low_support(self) -> None:
-    #     to_remove = []
-    #     for item in self.sequence_ids:
-    #         if len(self.sequence_ids[item])/self.db_size < self.min_sup:
-    #             to_remove.append(item)
-    #     for item in to_remove:
-    #         del self.sequence_ids[item]
-    #         del self.first_occurrences[item]
-    #         del self.last_occurrences[item]
+    def left_search(self, left_equiv: list[Rule]):
+        for i in range(len(left_equiv)):
+            left_equiv_prim = []
+            for j in range(i+1, len(left_equiv)):
+                uncommon_items = frozenset(left_equiv[i].consequent ^ left_equiv[j].consequent)
+                if not self.qualifies_to_pruning(uncommon_items):
+                    self.left_merge(left_equiv[i], left_equiv[j], left_equiv_prim)
+            self.left_search(left_equiv_prim)
 
-    def left_search(self, left_equiv):
-        pass
+    def qualifies_to_pruning(self, ab_set):
+        return self.sparse_count_matrix[ab_set] / self.db_size < self.min_sup
+
+    def left_merge(self, rule_s: Rule, rule_r: Rule, left_equiv: list[Rule]) -> None:
+        rule_sequences = rule_s.sequences & rule_r.sequences
+        if (rule_support := len(rule_sequences) / self.db_size) >= self.min_sup:
+            if (rule_confidence := len(rule_sequences) / len(rule_s.antecedent_sequences)) >= self.min_conf:
+                new_rule = Rule(rule_s.antecedent, rule_s.consequent | rule_r.consequent, rule_support, rule_confidence,
+                                sequences=rule_sequences, antecedent_sequences=rule_s.antecedent_sequences)
+                self.rules.append(new_rule)
+                left_equiv.append(new_rule)
 
     def right_search(self, right_equiv):
         pass
