@@ -13,7 +13,7 @@ class ERMiner:
         self.right_equivalence = defaultdict(list)
         self.left_store = defaultdict(lambda: defaultdict(list))
         self.rules: list[Rule] = []
-        self.sparse_count_matrix = defaultdict(int)
+        #self.sparse_count_matrix = defaultdict(int)
 
         # for every item, set of sequence ids where it occurs, eg. {1:{1, 2, 3}, 2:{1, 3, 4}...}
         self.sequence_ids = defaultdict(set)
@@ -42,14 +42,14 @@ class ERMiner:
                 self.last_occurrences[item].update({sequence_id: j})
                 if sequence_id not in self.first_occurrences[item].keys():
                     self.first_occurrences[item].update({sequence_id: j})
-        self.build_sparse_count_matrix()
+        #self.build_sparse_count_matrix()
 
-    def build_sparse_count_matrix(self):
-        all_items = list(self.sequence_ids.keys())
-        for i, item_a in enumerate(all_items):
-            for j in range(i+1, len(all_items)):
-                common_sequences = self.sequence_ids[item_a] & self.sequence_ids[all_items[j]]
-                self.sparse_count_matrix.update({frozenset({item_a, all_items[j]}): len(common_sequences)})
+    # def build_sparse_count_matrix(self):
+    #     all_items = list(self.sequence_ids.keys())
+    #     for i, item_a in enumerate(all_items):
+    #         for j in range(i+1, len(all_items)):
+    #             common_sequences = self.sequence_ids[item_a] & self.sequence_ids[all_items[j]]
+    #             self.sparse_count_matrix.update({frozenset({item_a, all_items[j]}): len(common_sequences)})
 
     def find_rules(self):
         all_item_ids = list(self.sequence_ids)
@@ -96,12 +96,12 @@ class ERMiner:
             left_equiv_prim = []
             for j in range(i+1, len(left_equiv)):
                 uncommon_items = frozenset(left_equiv[i].consequent ^ left_equiv[j].consequent)
-                if not self.qualifies_to_pruning(uncommon_items):
-                    self.left_merge(left_equiv[i], left_equiv[j], left_equiv_prim)
+                #if not self.qualifies_to_pruning(uncommon_items):
+                self.left_merge(left_equiv[i], left_equiv[j], left_equiv_prim)
             self.left_search(left_equiv_prim)
 
-    def qualifies_to_pruning(self, ab_set):
-        return self.sparse_count_matrix[ab_set] / self.db_size < self.min_sup
+    # def qualifies_to_pruning(self, ab_set):
+    #     return self.sparse_count_matrix[ab_set] / self.db_size < self.min_sup
 
     def left_merge(self, rule_s: Rule, rule_r: Rule, left_equiv: list[Rule]) -> None:
         rule_sequences = rule_s.sequences & rule_r.sequences
@@ -118,8 +118,8 @@ class ERMiner:
             right_equiv_prim = []
             for j in range(i+1, len(right_equiv)):
                 uncommon_items = frozenset(right_equiv[i].antecedent ^ right_equiv[j].antecedent)
-                if not self.qualifies_to_pruning(uncommon_items):
-                    self.right_merge(right_equiv[i], right_equiv[j], right_equiv_prim)
+                #if not self.qualifies_to_pruning(uncommon_items):
+                self.right_merge(right_equiv[i], right_equiv[j], right_equiv_prim)
             self.right_search(right_equiv_prim)
 
     def right_merge(self, rule_s: Rule, rule_r: Rule, right_equiv: list[Rule]) -> None:
