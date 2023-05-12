@@ -1,5 +1,6 @@
 from collections import defaultdict
 from Rule import Rule
+from copy import copy
 
 
 def read_database(path: str) -> list[list[set[int]]]:
@@ -54,6 +55,7 @@ class RuleGrowth:
                                           sids_i_j=sids_i_j, first_occurrences_i=self.first_occurrences[i],
                                           last_occurrences_j=self.last_occurrences[j])
                         self.check_rule_confidence(new_rule, self.sequence_ids[i], sids_i_j)
+                    # TODO: lines 48-57 with i and j swapped
 
     def check_rule_confidence(self, new_rule, sids_i, sids_i_j) -> None:
         if (rule_confidence := len(sids_i_j) / len(sids_i)) >= self.min_conf:
@@ -106,24 +108,42 @@ class RuleGrowth:
         sids_c = self.find_items_to_left_expand(list(sids_i_j), last_occurrences_j, max(rule_i_j.antecedent))
         for c in sids_c:
             if (rule_support := len(sids_c[c])/self.db_size) >= self.min_sup:
-                sids_i_c = sids_c[c] & sids_i
+                sids_ic = sids_c[c] & sids_i
                 rule_ic_j = Rule(rule_i_j.antecedent | {c}, rule_i_j.consequent, rule_support)
-                self.expand_left(rule_i_j=rule_ic_j, sids_i=sids_i_c,
+                self.expand_left(rule_i_j=rule_ic_j, sids_i=sids_ic,
                                  sids_i_j=sids_c[c], last_occurrences_j=last_occurrences_j)
-                self.check_rule_confidence(rule_ic_j, sids_i=sids_i_c, sids_i_j=sids_c[c])
+                self.check_rule_confidence(rule_ic_j, sids_i=sids_ic, sids_i_j=sids_c[c])
 
     def expand_right(self, rule_i_j: Rule, sids_i: set, sids_j: set, sids_i_j: set,
                      first_occurrences_i: dict, last_occurrences_j: dict) -> None:
         sids_c = self.find_items_to_right_expand(list(sids_i_j), first_occurrences_i, max(rule_i_j.consequent))
+        for c in sids_c:
+            if (rule_support := len(sids_c[c])/self.db_size) >= self.min_sup:
+                sids_jc = sids_c[c] & sids_j
+                last_occurrences_jc = self.update_last_occurrences(last_occurrences_j, c, sids_jc)
+                rule_i_jc = Rule(rule_i_j.antecedent, rule_i_j.consequent | {c}, rule_support)
+                self.expand_left(rule_i_j=rule_i_jc, sids_i=sids_i,
+                                 sids_i_j=sids_c[c], last_occurrences_j=last_occurrences_jc)
+                self.expand_right(rule_i_j=rule_i_jc, sids_i=sids_i, sids_j=sids_j,
+                                  sids_i_j=sids_c[c], first_occurrences_i=first_occurrences_i,
+                                  last_occurrences_j=last_occurrences_jc)
+                self.check_rule_confidence(rule_i_jc, sids_i=sids_i, sids_i_j=sids_c[c])
+
+    def update_last_occurrences(self, last_occurrences_j: dict[int], c: int, sids_jc: set) -> dict[int]:
+        last_occurrences_jc = copy(last_occurrences_j)
+        for sid in sids_jc:
+            for j, itemset in enumerate(self.database[sid]):
+                if c in itemset and j < last_occurrences_jc[sid]:
+                    last_occurrences_jc.update({sid: j})
+        return last_occurrences_jc
 
     def run(self):
         self.scan_database()
         self.find_rules()
+        self.print_rules()
 
 
 if __name__ == "__main__":
     data = read_database("data/example.txt")
     rulegrowth = RuleGrowth(data, 0.5, 0.75)
     rulegrowth.run()
-    rulegrowth.print_rules()
-    pass
