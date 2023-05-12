@@ -40,29 +40,33 @@ class RuleGrowth:
                     if i not in self.first_occurrences[item].keys():
                         self.first_occurrences[item].update({i: j})
 
-    def find_rules(self):
+    def find_rules(self) -> None:
         all_item_ids = list(self.sequence_ids)
         for i in all_item_ids:
             for j in all_item_ids[i+1:]:
                 common_sequences = self.sequence_ids[i] & self.sequence_ids[j]
                 if len(common_sequences)/self.db_size >= self.min_sup:
                     sids_i_j, sids_j_i = self.find_rule_sequences(common_sequences, i, j)
-                    if (rule_support := len(sids_i_j)/self.db_size) >= self.min_sup:
-                        new_rule = Rule({i}, {j}, rule_support)
-                        self.expand_left(rule_i_j=new_rule, sids_i=self.sequence_ids[i],
-                                         sids_i_j=sids_i_j, last_occurrences_j=self.last_occurrences[j])
-                        self.expand_right(rule_i_j=new_rule, sids_i=self.sequence_ids[i], sids_j=self.sequence_ids[j],
-                                          sids_i_j=sids_i_j, first_occurrences_i=self.first_occurrences[i],
-                                          last_occurrences_j=self.last_occurrences[j])
-                        self.check_rule_confidence(new_rule, self.sequence_ids[i], sids_i_j)
-                    # TODO: lines 48-57 with i and j swapped
+                    self.expand(antecedent=i, consequent=j, sids=sids_i_j)
+                    self.expand(antecedent=j, consequent=i, sids=sids_j_i)
+
+    def expand(self, antecedent: int, consequent: int, sids: set[int]) -> None:
+        if (rule_support := len(sids) / self.db_size) >= self.min_sup:
+            new_rule = Rule({antecedent}, {consequent}, rule_support)
+            self.expand_left(rule_i_j=new_rule, sids_i=self.sequence_ids[antecedent],
+                             sids_i_j=sids, last_occurrences_j=self.last_occurrences[consequent])
+            self.expand_right(rule_i_j=new_rule, sids_i=self.sequence_ids[antecedent],
+                              sids_j=self.sequence_ids[consequent],
+                              sids_i_j=sids, first_occurrences_i=self.first_occurrences[antecedent],
+                              last_occurrences_j=self.last_occurrences[consequent])
+            self.check_rule_confidence(new_rule, self.sequence_ids[antecedent], sids)
 
     def check_rule_confidence(self, new_rule, sids_i, sids_i_j) -> None:
         if (rule_confidence := len(sids_i_j) / len(sids_i)) >= self.min_conf:
             new_rule.confidence = round(rule_confidence, 3)
             self.rules.append(new_rule)
 
-    def find_rule_sequences(self, common_sequences, i, j):
+    def find_rule_sequences(self, common_sequences, i, j) -> tuple[set[int], set[int]]:
         sids_i_j = set()
         sids_j_i = set()
         for sequence in common_sequences:
@@ -144,6 +148,6 @@ class RuleGrowth:
 
 
 if __name__ == "__main__":
-    data = read_database("data/example.txt")
+    data = read_database("example.txt")
     rulegrowth = RuleGrowth(data, 0.5, 0.75)
     rulegrowth.run()
