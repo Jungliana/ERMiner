@@ -39,16 +39,6 @@ class RuleGrowth:
                     if i not in self.first_occurrences[item].keys():
                         self.first_occurrences[item].update({i: j})
 
-    def remove_items_with_low_support(self) -> None:
-        to_remove = []
-        for item in self.sequence_ids:
-            if len(self.sequence_ids[item])/self.db_size < self.min_sup:
-                to_remove.append(item)
-        for item in to_remove:
-            del self.sequence_ids[item]
-            del self.first_occurrences[item]
-            del self.last_occurrences[item]
-
     def find_rules(self):
         all_item_ids = list(self.sequence_ids)
         for i in all_item_ids:
@@ -60,8 +50,15 @@ class RuleGrowth:
                         new_rule = Rule({i}, {j}, rule_support)
                         self.expand_left(rule_i_j=new_rule, sids_i=self.sequence_ids[i],
                                          sids_i_j=sids_i_j, last_occurrences_j=self.last_occurrences[j])
-                        # self.expand_right()
-                        self.rules.append(new_rule)
+                        self.expand_right(rule_i_j=new_rule, sids_i=self.sequence_ids[i], sids_j=self.sequence_ids[j],
+                                          sids_i_j=sids_i_j, first_occurrences_i=self.first_occurrences[i],
+                                          last_occurrences_j=self.last_occurrences[j])
+                        self.check_rule_confidence(new_rule, self.sequence_ids[i], sids_i_j)
+
+    def check_rule_confidence(self, new_rule, sids_i, sids_i_j) -> None:
+        if (rule_confidence := len(sids_i_j) / len(sids_i)) >= self.min_conf:
+            new_rule.confidence = round(rule_confidence, 3)
+            self.rules.append(new_rule)
 
     def find_rule_sequences(self, common_sequences, i, j):
         sids_i_j = set()
@@ -73,7 +70,12 @@ class RuleGrowth:
                 sids_j_i.add(sequence)
         return sids_i_j, sids_j_i
 
-    def find_items_to_expand(self, sequence_ids: list[int], last_occurrences: dict, max_item: int) -> dict:
+    def find_items_to_left_expand(self, sequence_ids: list[int], last_occurrences: dict, max_item: int) -> dict:
+        """
+        For each sid ∈ sidsI->J, scan the sequence sid from the first itemset to the itemset before
+        the last occurrence of J. For each item c appearing in these sequences that is lexically larger
+        than items in I, record in a variable sidsIc->J the sids of the sequences where c is found.
+        """
         sequence_ids_c = defaultdict(set)
         for sid in sequence_ids:
             for i in range(last_occurrences[sid]):
@@ -82,23 +84,37 @@ class RuleGrowth:
                         sequence_ids_c[item].add(sid)
         return sequence_ids_c
 
+    def find_items_to_right_expand(self, sequence_ids: list[int], first_occurrences: dict, max_item: int) -> dict:
+        """
+        For each sid ∈ sidsI->J, scan the sequence sid from the itemset after the first occurrence of I
+        to the last itemset. For each item c appearing in these sequences that is lexically larger than
+        items in J, record in a variable sidsI->Jc the sids of the sequences where c is found.
+        """
+        sequence_ids_c = defaultdict(set)
+        for sid in sequence_ids:
+            for i in range(first_occurrences[sid]+1, len(self.database[sid])):
+                for item in self.database[sid][i]:
+                    if item > max_item:
+                        sequence_ids_c[item].add(sid)
+        return sequence_ids_c
+
     def expand_left(self, rule_i_j: Rule, sids_i: set,
                     sids_i_j: set, last_occurrences_j: dict) -> None:
-        # rule, eg. ({a, b}, {c})
-        # sids I, eg. {1, 2, 5}
-        # sids I->J, eg. {1, 5}
-        # last occurrences J, eg. {1:3, 2:5, 7:2}
-        sids_c = self.find_items_to_expand(list(sids_i_j), last_occurrences_j, max(rule_i_j.antecedent))
+        # sids i, eg. {1, 2, 5}
+        # sids i->j, eg. {1, 5}
+        # last occurrences j, eg. {1:3, 2:5, 7:2}
+        sids_c = self.find_items_to_left_expand(list(sids_i_j), last_occurrences_j, max(rule_i_j.antecedent))
         for c in sids_c:
             if (rule_support := len(sids_c[c])/self.db_size) >= self.min_sup:
                 sids_i_c = sids_c[c] & sids_i
                 rule_ic_j = Rule(rule_i_j.antecedent | {c}, rule_i_j.consequent, rule_support)
                 self.expand_left(rule_i_j=rule_ic_j, sids_i=sids_i_c,
                                  sids_i_j=sids_c[c], last_occurrences_j=last_occurrences_j)
-                self.rules.append(rule_ic_j)
+                self.check_rule_confidence(rule_ic_j, sids_i=sids_i_c, sids_i_j=sids_c[c])
 
-    def expand_right(self):
-        pass
+    def expand_right(self, rule_i_j: Rule, sids_i: set, sids_j: set, sids_i_j: set,
+                     first_occurrences_i: dict, last_occurrences_j: dict) -> None:
+        sids_c = self.find_items_to_right_expand(list(sids_i_j), first_occurrences_i, max(rule_i_j.consequent))
 
     def run(self):
         self.scan_database()
