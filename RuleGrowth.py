@@ -63,7 +63,7 @@ class RuleGrowth:
 
     def expand(self, antecedent: int, consequent: int, sids: set[int]) -> None:
         if (rule_support := len(sids) / self.db_size) >= self.min_sup:
-            new_rule = Rule({antecedent}, {consequent}, rule_support)
+            new_rule = Rule({antecedent}, {consequent}, round(rule_support, 3))
             self.expand_left(rule_i_j=new_rule, sids_i=self.sequence_ids[antecedent],
                              sids_i_j=sids, last_occurrences_j=self.last_occurrences[consequent])
             self.expand_right(rule_i_j=new_rule, sids_i=self.sequence_ids[antecedent],
@@ -78,7 +78,7 @@ class RuleGrowth:
         for c in sids_c:
             if (rule_support := len(sids_c[c])/self.db_size) >= self.min_sup:
                 sids_ic = sids_c[c] & sids_i
-                rule_ic_j = Rule(rule_i_j.antecedent | {c}, rule_i_j.consequent, rule_support)
+                rule_ic_j = Rule(rule_i_j.antecedent | {c}, rule_i_j.consequent, round(rule_support, 3))
                 self.expand_left(rule_i_j=rule_ic_j, sids_i=sids_ic,
                                  sids_i_j=sids_c[c], last_occurrences_j=last_occurrences_j)
                 self.check_rule_confidence(rule_ic_j, sids_i=sids_ic, sids_i_j=sids_c[c])
@@ -104,7 +104,7 @@ class RuleGrowth:
             if (rule_support := len(sids_c[c])/self.db_size) >= self.min_sup:
                 sids_jc = sids_c[c] & sids_j
                 last_occurrences_jc = self.update_last_occurrences(last_occurrences_j, c, sids_jc)
-                rule_i_jc = Rule(rule_i_j.antecedent, rule_i_j.consequent | {c}, rule_support)
+                rule_i_jc = Rule(rule_i_j.antecedent, rule_i_j.consequent | {c}, round(rule_support, 3))
                 self.expand_left(rule_i_j=rule_i_jc, sids_i=sids_i,
                                  sids_i_j=sids_c[c], last_occurrences_j=last_occurrences_jc)
                 self.expand_right(rule_i_j=rule_i_jc, sids_i=sids_i, sids_j=sids_j,
@@ -145,5 +145,5 @@ class RuleGrowth:
 
 
 if __name__ == "__main__":
-    rulegrowth = RuleGrowth("data/example.txt", 0.25, 0.75)
+    rulegrowth = RuleGrowth("data/example.txt", 0.5, 0.75)
     rulegrowth.run()
