@@ -1,6 +1,6 @@
 class Rule:
-    def __init__(self, antecedent: set[int], consequent: set[int],
-                 support: float = 0., confidence: float = 0., sequences=None, antecedent_sequences=None):
+    def __init__(self, antecedent: set[int], consequent: set[int], support: float = 0.,
+                 confidence: float = 0., sequences=None, antecedent_sequences=None) -> None:
         self.antecedent: set[int] = antecedent
         self.consequent: set[int] = consequent
         self.support: float = support
