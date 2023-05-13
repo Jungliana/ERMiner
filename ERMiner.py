@@ -1,8 +1,23 @@
 from collections import defaultdict
-from Rule import Rule
+
+
+class Rule:
+    def __init__(self, antecedent: set[int], consequent: set[int], support: float = 0.,
+                 confidence: float = 0., sequences=None, antecedent_sequences=None) -> None:
+        self.antecedent: set[int] = antecedent
+        self.consequent: set[int] = consequent
+        self.support: float = support
+        self.confidence: float = confidence
+        self.sequences: set = sequences
+        self.antecedent_sequences: set = antecedent_sequences
+
+    def __str__(self) -> str:
+        return f"{self.antecedent} => {self.consequent}, support={self.support}, confidence={self.confidence}"
 
 
 class ERMiner:
+    ROUND_DIGITS = 3
+
     def __init__(self, path: str, min_sup: float = 0.5, min_con: float = 0.75):
         self.database_file: str = path
         self.db_size: int = 0
@@ -35,11 +50,11 @@ class ERMiner:
         """
         with open(path) as file:
             for i, line in enumerate(file):
-                if line[0] != '-':
+                if line[0] != '-':  # Don't scan empty sequences
+                    self.db_size += 1
                     sequence = [set(map(int, transaction.split()))
                                 for transaction in line.rstrip(end_char).split(separator)]
                     self.scan_sequence(sequence, i)
-                self.db_size = i
 
     def scan_sequence(self, sequence: list[set[int]], sequence_id: int) -> None:
         """
@@ -72,7 +87,7 @@ class ERMiner:
         Build equivalence classes of rules of size 1*1.
         """
         if (rule_support := len(sids) / self.db_size) >= self.min_sup:
-            new_rule = Rule({antecedent}, {consequent}, round(rule_support, 3), sequences=sids,
+            new_rule = Rule({antecedent}, {consequent}, round(rule_support, ERMiner.ROUND_DIGITS), sequences=sids,
                             antecedent_sequences=self.sequence_ids[antecedent])
             self.left_equivalence[antecedent].append(new_rule)
             self.right_equivalence[consequent].append(new_rule)
@@ -84,7 +99,7 @@ class ERMiner:
         then add the rule to the list of discovered rules.
         """
         if (rule_confidence := len(sids_i_j) / len(sids_i)) >= self.min_conf:
-            new_rule.confidence = round(rule_confidence, 3)
+            new_rule.confidence = round(rule_confidence, ERMiner.ROUND_DIGITS)
             self.rules.append(new_rule)
 
     def find_rule_sequences(self, common_sequences: set[int], i: int, j: int) -> tuple[set[int], set[int]]:
@@ -182,5 +197,5 @@ class ERMiner:
 
 
 if __name__ == "__main__":
-    erminer = ERMiner("data/example.txt", 0.5, 0.75)
+    erminer = ERMiner("data/example.txt", min_sup=0.5, min_con=0.75)
     erminer.run()
