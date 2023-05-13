@@ -21,6 +21,10 @@ class ERMiner:
         self.last_occurrences = defaultdict(dict)
 
     def run(self) -> None:
+        """
+        Run the ERMiner algorithm: scan the database once,
+        find all valid rules, then print them.
+        """
         self.read_database(self.database_file)
         self.find_rules()
         self.print_rules()
@@ -51,13 +55,7 @@ class ERMiner:
                     sids_i_j, sids_j_i = self.find_rule_sequences(common_sequences, i, j)
                     self.build_equivalences(i, j, sids_i_j)
                     self.build_equivalences(j, i, sids_j_i)
-        for left_class in self.left_equivalence:
-            self.left_search(self.left_equivalence[left_class])
-        for right_class in self.right_equivalence:
-            self.right_search(self.right_equivalence[right_class])
-        for left_class_size in self.left_store:
-            for itemset in self.left_store[left_class_size]:
-                self.left_search(self.left_store[left_class_size][itemset])
+        self.do_searches()
 
     def build_equivalences(self, antecedent: int, consequent: int, sids: set[int]) -> None:
         if (rule_support := len(sids) / self.db_size) >= self.min_sup:
@@ -81,6 +79,15 @@ class ERMiner:
             if self.first_occurrences[j][sequence] < self.last_occurrences[i][sequence]:
                 sids_j_i.add(sequence)
         return sids_i_j, sids_j_i
+
+    def do_searches(self) -> None:
+        for left_class in self.left_equivalence:
+            self.left_search(self.left_equivalence[left_class])
+        for right_class in self.right_equivalence:
+            self.right_search(self.right_equivalence[right_class])
+        for left_class_size in self.left_store:
+            for itemset in self.left_store[left_class_size]:
+                self.left_search(self.left_store[left_class_size][itemset])
 
     def left_search(self, left_equiv: list[Rule]) -> None:
         for i in range(len(left_equiv)):
