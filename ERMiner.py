@@ -8,8 +8,8 @@ class Rule:
         self.consequent: set[int] = consequent
         self.support: float = support
         self.confidence: float = confidence
-        self.sequences: set = sequences
-        self.antecedent_sequences: set = antecedent_sequences
+        self.sequences: set[int] = {} if sequences is None else sequences
+        self.antecedent_sequences: set[int] = {} if antecedent_sequences is None else antecedent_sequences
 
     def __str__(self) -> str:
         return f"{self.antecedent} => {self.consequent}, support={self.support}, confidence={self.confidence}"
@@ -137,10 +137,6 @@ class ERMiner:
         for i in range(len(left_equiv)):
             left_equiv_prim = []
             for j in range(i+1, len(left_equiv)):
-                # Pruning without the Sparse Count Matrix
-                # uncommon_items = left_equiv[i].consequent ^ left_equiv[j].consequent
-                # if len(self.sequence_ids[uncommon_items.pop()] &
-                #        self.sequence_ids[uncommon_items.pop()]) / self.db_size >= self.min_sup:
                 self.left_merge(left_equiv[i], left_equiv[j], left_equiv_prim)
             self.left_search(left_equiv_prim)
 
@@ -165,10 +161,6 @@ class ERMiner:
         for i in range(len(right_equiv)):
             right_equiv_prim = []
             for j in range(i+1, len(right_equiv)):
-                # Pruning without the Sparse Count Matrix
-                # uncommon_items = right_equiv[i].antecedent ^ right_equiv[j].antecedent
-                # if len(self.sequence_ids[uncommon_items.pop()] &
-                #        self.sequence_ids[uncommon_items.pop()]) / self.db_size >= self.min_sup:
                 self.right_merge(right_equiv[i], right_equiv[j], right_equiv_prim)
             self.right_search(right_equiv_prim)
 
