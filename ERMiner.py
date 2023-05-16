@@ -1,4 +1,5 @@
 from collections import defaultdict
+import datetime
 
 
 class Rule:
@@ -35,14 +36,19 @@ class ERMiner:
         self.first_occurrences = defaultdict(dict)
         self.last_occurrences = defaultdict(dict)
 
-    def run(self) -> None:
+    def run(self, printing: bool = True) -> tuple[float, int]:
         """
         Run the ERMiner algorithm: scan the database once,
         find all valid rules, then print them.
         """
+        start = datetime.datetime.now()
         self.read_database(self.database_file)
         self.find_rules()
-        self.print_rules()
+        end = datetime.datetime.now()
+        if printing:
+            self.print_rules()
+            print(f'Time: {(end - start).total_seconds()} [s], rules found: {len(self.rules)}')
+        return (end - start).total_seconds(), len(self.rules)
 
     def read_database(self, path: str, separator: str = "-1", end_char: str = "-1 -2\n") -> None:
         """
@@ -186,8 +192,3 @@ class ERMiner:
         """
         for rule in self.rules:
             print(rule)
-
-
-if __name__ == "__main__":
-    erminer = ERMiner("data/example.txt", min_sup=0.5, min_con=0.75)
-    erminer.run()
