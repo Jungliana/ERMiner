@@ -1,4 +1,5 @@
 from collections import defaultdict
+from math import ceil
 import datetime
 
 
@@ -24,6 +25,7 @@ class ERMiner:
         self.db_size: int = 0
         self.min_sup: float = min_sup
         self.min_conf: float = min_con
+        self.min_rules_sup: int = 0
 
         self.left_equivalence = defaultdict(list)
         self.right_equivalence = defaultdict(list)
@@ -50,7 +52,7 @@ class ERMiner:
             print(f'Time: {(end - start).total_seconds()} [s], rules found: {len(self.rules)}')
         return (end - start).total_seconds(), len(self.rules)
 
-    def read_database(self, path: str, separator: str = "-1", end_char: str = "-1 -2\n") -> None:
+    def read_database(self, path: str, separator: str = "-1") -> None:
         """
         Read a sequence database from a text file.
         """
@@ -59,8 +61,9 @@ class ERMiner:
                 if line[0] != '-':  # Don't scan empty sequences
                     self.db_size += 1
                     sequence = [set(map(int, transaction.split()))
-                                for transaction in line.rstrip(end_char).split(separator)]
+                                for transaction in line[:-7].split(separator)]
                     self.scan_sequence(sequence, i)
+        self.min_rules_sup = ceil(self.min_sup * self.db_size)
 
     def scan_sequence(self, sequence: list[set[int]], sequence_id: int) -> None:
         """
@@ -82,7 +85,7 @@ class ERMiner:
         for last_i, i in enumerate(all_item_ids):
             for j in all_item_ids[last_i+1:]:
                 common_sequences = self.sequence_ids[i] & self.sequence_ids[j]
-                if len(common_sequences)/self.db_size >= self.min_sup:
+                if len(common_sequences) >= self.min_rules_sup:
                     sids_i_j, sids_j_i = self.find_rule_sequences(common_sequences, i, j)
                     self.build_equivalences(i, j, sids_i_j)
                     self.build_equivalences(j, i, sids_j_i)
@@ -92,7 +95,7 @@ class ERMiner:
         """
         Build equivalence classes of rules of size 1*1.
         """
-        if (rule_support := len(sids) / self.db_size) >= self.min_sup:
+        if (rule_support := len(sids)) >= self.min_rules_sup:
             new_rule = Rule({antecedent}, {consequent}, round(rule_support, ERMiner.ROUND_DIGITS), sequences=sids,
                             antecedent_sequences=self.sequence_ids[antecedent])
             self.left_equivalence[antecedent].append(new_rule)
@@ -151,7 +154,7 @@ class ERMiner:
         Perform a left merge on two rules from the same left equivalence class.
         """
         rule_sequences = rule_s.sequences & rule_r.sequences
-        if (rule_support := len(rule_sequences) / self.db_size) >= self.min_sup:
+        if (rule_support := len(rule_sequences)) >= self.min_rules_sup:
             new_rule = Rule(rule_s.antecedent, rule_s.consequent | rule_r.consequent, rule_support,
                             sequences=rule_sequences, antecedent_sequences=rule_s.antecedent_sequences)
 
@@ -175,7 +178,7 @@ class ERMiner:
         Perform a right merge on two rules from the same right equivalence class.
         """
         rule_sequences = rule_s.sequences & rule_r.sequences
-        if (rule_support := len(rule_sequences) / self.db_size) >= self.min_sup:
+        if (rule_support := len(rule_sequences)) >= self.min_rules_sup:
             antecedent_sequences = rule_s.antecedent_sequences & rule_r.antecedent_sequences
             new_rule = Rule(rule_s.antecedent | rule_r.antecedent, rule_s.consequent, rule_support,
                             sequences=rule_sequences, antecedent_sequences=antecedent_sequences)
