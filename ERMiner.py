@@ -64,6 +64,7 @@ class ERMiner:
                                 for transaction in line[:-7].split(separator)]
                     self.scan_sequence(sequence, i)
         self.min_rules_sup = ceil(self.min_sup * self.db_size)
+        self.remove_items_with_low_support()
 
     def scan_sequence(self, sequence: list[set[int]], sequence_id: int) -> None:
         """
@@ -76,6 +77,16 @@ class ERMiner:
                 self.last_occurrences[item].update({sequence_id: j})
                 if sequence_id not in self.first_occurrences[item].keys():
                     self.first_occurrences[item].update({sequence_id: j})
+
+    def remove_items_with_low_support(self) -> None:
+        """
+        Remove items with support lower than min_sup.
+        """
+        for item in list(self.sequence_ids.keys()):
+            if len(self.sequence_ids[item]) < self.min_rules_sup:
+                del self.sequence_ids[item]
+                del self.first_occurrences[item]
+                del self.last_occurrences[item]
 
     def find_rules(self) -> None:
         """
@@ -96,7 +107,7 @@ class ERMiner:
         Build equivalence classes of rules of size 1*1.
         """
         if (rule_support := len(sids)) >= self.min_rules_sup:
-            new_rule = Rule({antecedent}, {consequent}, round(rule_support, ERMiner.ROUND_DIGITS), sequences=sids,
+            new_rule = Rule({antecedent}, {consequent}, rule_support, sequences=sids,
                             antecedent_sequences=self.sequence_ids[antecedent])
             self.left_equivalence[antecedent].append(new_rule)
             self.right_equivalence[consequent].append(new_rule)
