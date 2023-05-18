@@ -6,7 +6,7 @@ class TestERMiner:
     def test_line_read(self):
         line = '3 1 -1 2 -1 -2\n'
         sequence = [set(map(int, transaction.split()))
-                    for transaction in line[:-7].split('-1')]
+                    for transaction in line[:-6].split('-1')]
         assert sequence == [{3, 1}, {2}]
 
     def test_read_database(self):

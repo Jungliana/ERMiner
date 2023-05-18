@@ -69,7 +69,7 @@ class ERMiner:
                 if line[0] not in '-\n':  # Don't scan empty sequences
                     self.db_size += 1
                     sequence = [set(map(int, transaction.split()))
-                                for transaction in line[:-7].split(separator)]
+                                for transaction in line[:-6].split(separator)]
                     self.scan_sequence(sequence, i)
         self.min_rules_sup = ceil(self.min_sup * self.db_size)
         self.remove_items_with_low_support()
