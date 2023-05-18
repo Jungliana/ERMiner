@@ -19,9 +19,11 @@ class Rule:
 
 class ERMiner:
     ROUND_DIGITS = 3
+    ERROR_RETURN = -1
 
-    def __init__(self, path: str, min_sup: float = 0.5, min_con: float = 0.75):
+    def __init__(self, path: str, min_sup: float = 0.5, min_con: float = 0.75, output: str = "output.txt"):
         self.database_file: str = path
+        self.output: str = output
         self.db_size: int = 0
         self.min_sup: float = min_sup
         self.min_conf: float = min_con
@@ -38,18 +40,24 @@ class ERMiner:
         self.first_occurrences = defaultdict(dict)
         self.last_occurrences = defaultdict(dict)
 
-    def run(self, printing: bool = True) -> tuple[float, int]:
+    def run(self, printing: bool = True, out_file: bool = False) -> tuple[float, int]:
         """
         Run the ERMiner algorithm: scan the database once,
         find all valid rules, then print them.
         """
         start = datetime.datetime.now()
-        self.read_database(self.database_file)
+        try:
+            self.read_database(self.database_file)
+        except Exception as e:
+            print(f"Problem with file: {e}.")
+            return self.ERROR_RETURN, self.ERROR_RETURN
         self.find_rules()
         end = datetime.datetime.now()
+        if out_file:
+            self.write_output()
         if printing:
             self.print_rules()
-            print(f'Time: {(end - start).total_seconds()} [s], rules found: {len(self.rules)}')
+        print(f'\nTime: {(end - start).total_seconds()} [s], rules found: {len(self.rules)}')
         return (end - start).total_seconds(), len(self.rules)
 
     def read_database(self, path: str, separator: str = "-1") -> None:
@@ -58,7 +66,7 @@ class ERMiner:
         """
         with open(path) as file:
             for i, line in enumerate(file):
-                if line[0] != '-':  # Don't scan empty sequences
+                if line[0] not in '-\n':  # Don't scan empty sequences
                     self.db_size += 1
                     sequence = [set(map(int, transaction.split()))
                                 for transaction in line[:-7].split(separator)]
@@ -206,3 +214,14 @@ class ERMiner:
         """
         for rule in self.rules:
             print(rule)
+
+    def write_output(self) -> None:
+        """
+        Output to a file all valid sequential rules found in the database.
+        """
+        try:
+            with open(self.output, 'w') as fp:
+                for rule in self.rules:
+                    fp.write("%s\n" % rule)
+        except Exception as e:
+            print(f"Problem with output: {e}.")
